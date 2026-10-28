@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#dc1f2e" />
+  <title>Pokédex 8-Bit — iPhone Duo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="fold-state-unfolded">
+
+  <!-- ================= CLOSED POKÉDEX EXTERIOR COVER (Shown when iPhone Duo is folded/closed) ================= -->
+  <aside id="pokedex-cover" class="pokedex-cover" aria-label="Tapa Exterior de la Pokédex Cerrada">
+    <!-- Top Section: Blue Lens + 3 LEDs -->
+    <div class="cover-top-header">
+      <div class="cover-blue-lens-ring">
+        <div id="cover-blue-lens" class="cover-blue-lens">
+          <div class="cover-lens-glare"></div>
+        </div>
+      </div>
+      <div class="cover-leds">
+        <span class="cover-led red"></span>
+        <span class="cover-led yellow"></span>
+        <span class="cover-led green"></span>
+      </div>
+    </div>
+
+    <!-- Main Lower Lid Door with Stepped Diagonal Cut, Yellow Triangle & Bottom Groove -->
+    <div class="cover-door-area">
+      <svg class="cover-door-svg" viewBox="0 0 400 700" preserveAspectRatio="none" aria-hidden="true">
+        <path
+          d="M 0,88 L 165,88 L 230,22 L 400,22"
+          fill="none"
+          stroke="#4a070d"
+          stroke-width="6"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M 22,110 L 174,110 L 238,44 L 378,44 L 378,668 L 22,668 Z"
+          fill="#d61c2b"
+          stroke="#5c0910"
+          stroke-width="4"
+          stroke-linejoin="round"
+        />
+      </svg>
+
+      <!-- Yellow Triangle Latch pointing RIGHT (▶) -->
+      <button id="btn-unlatch-cover" class="cover-yellow-triangle" aria-label="Abrir Pokédex" title="Abrir Pokédex"></button>
+
+      <!-- Bottom Horizontal Pill Groove -->
+      <div class="cover-bottom-groove"></div>
+    </div>
+
+    <!-- Right Cylindrical Hinge Spine -->
+    <div class="cover-right-hinge" aria-hidden="true">
+      <div class="cover-hinge-joint top"></div>
+      <div class="cover-hinge-joint bottom"></div>
+    </div>
+  </aside>
+
+  <!-- ================= OPEN POKÉDEX FULL-VIEWPORT SHELL ================= -->
+  <div id="pokedex-app" class="pokedex-shell">
+
+    <!-- ================= LEFT WING (VISOR, GREEN SUB-DISPLAY & D-PAD) ================= -->
+    <section class="pokedex-wing wing-primary" aria-label="Visor Principal Pokédex">
+      <!-- Top Sensor Header (Blue Lens + 3 LEDs + Stepped Seam) -->
+      <header class="left-top-header">
+        <div class="sensor-cluster">
+          <div class="blue-lens-ring">
+            <div id="main-blue-lens" class="blue-lens">
+              <div class="lens-glare"></div>
+            </div>
+          </div>
+          <div class="status-leds">
+            <span class="led led-red" id="led-red"></span>
+            <span class="led led-yellow" id="led-yellow"></span>
+            <span class="led led-green" id="led-green"></span>
+          </div>
+        </div>
+        <svg class="left-header-seam" viewBox="0 0 400 44" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M 0,38 L 175,38 L 230,6 L 400,6" fill="none" stroke="#4a070d" stroke-width="6" stroke-linejoin="round" />
+        </svg>
+      </header>
+
+      <!-- Left Inner Recessed Frame -->
+      <div class="left-inner-body">
+        <!-- Classic Light-Gray Visor Bezel with Chamfered Bottom-Left Corner -->
+        <div class="visor-bezel">
+          <div class="visor-top-dots">
+            <span class="visor-dot"></span>
+            <span class="visor-dot"></span>
+          </div>
+
+          <div id="crt-screen" class="crt-screen mode-color scanlines-on">
+            <div class="pixel-grid-bg"></div>
+
+            <!-- Top HUD inside CRT -->
+            <div class="crt-hud-top">
+              <span id="pokemon-number" class="pixel-id">#001</span>
+              <div class="crt-badges">
+                <span id="shiny-indicator" class="crt-pill hidden">★ SHINY</span>
+              </div>
+            </div>
+
+            <!-- 8-Bit Sprite Stage -->
+            <div class="sprite-stage" id="sprite-stage">
+              <div id="loading-spinner" class="pixel-loader hidden">
+                <div class="pokeball-pixel"></div>
+                <span>CARGANDO...</span>
+              </div>
+              <img
+                id="pokemon-sprite"
+                class="pokemon-sprite"
+                src=""
+                alt="Sprite 8-Bit del Pokémon"
+                draggable="false"
+              />
+            </div>
+
+            <!-- Bottom HUD inside CRT -->
+            <div class="crt-hud-bottom">
+              <h1 id="pokemon-name" class="pixel-name">BULBASAUR</h1>
+              <div id="pokemon-types" class="type-badges-row"></div>
+            </div>
+          </div>
+
+          <!-- Visor Bottom Row: Red Button on Left + 4 Speaker Lines on Right -->
+          <div class="visor-bottom-bar">
+            <button id="btn-tts" class="visor-red-dot-btn" title="Leer entrada con voz de la Pokédex" aria-label="Voz Pokédex"></button>
+            <div class="speaker-grille" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Classic Lower Controls: Dark Round Button + Red/Blue Bars + Green Screen + D-Pad -->
+        <div class="left-lower-controls">
+          <!-- Left Column: Round Dark Button -->
+          <div class="left- joy-col">
+            <button id="btn-a" class="dark-round-btn" title="Reproducir Grito 8-Bit" aria-label="Grito Pokémon"></button>
+          </div>
+
+          <!-- Center Column: Thin Red & Blue Pill Bars + Green LCD Box -->
+          <div class="center-lcd-col">
+            <div class="thin-bars-row">
+              <button id="btn-shiny" class="thin-bar-btn bar-red" title="Alternar Shiny (Variocolor)"></button>
+              <button id="btn-flip-sprite" class="thin-bar-btn bar-blue" title="Girar Sprite (Frente / Espalda)"></button>
+            </div>
+            <div id="green-sub-screen" class="green-sub-screen" title="Toca para cambiar paleta Game Boy">
+              <span id="green-lcd-id">#001</span>
+              <span id="green-lcd-name">BULBASAUR</span>
+            </div>
+          </div>
+
+          <!-- Right Column: Classic Dark Cross D-Pad -->
+          <div class="dpad-container">
+            <div class="dpad">
+              <button id="dpad-up" class="dpad-btn up" aria-label="-10 Pokémon">▲</button>
+              <button id="dpad-left" class="dpad-btn left" aria-label="Pokémon Anterior">◀</button>
+              <div class="dpad-center"></div>
+              <button id="dpad-right" class="dpad-btn right" aria-label="Siguiente Pokémon">▶</button>
+              <button id="dpad-down" class="dpad-btn down" aria-label="+10 Pokémon">▼</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Single-Screen Folded Mode Quick Drawer Toggle (Only when 1 screen unlatched) -->
+        <button id="btn-folded-drawer-toggle" class="folded-drawer-btn">
+          <span>📂 PANEL DERECHO POKÉDEX</span>
+          <span>▲</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ================= CENTER CYLINDRICAL HINGE ================= -->
+    <div id="fold-hinge-gutter" class="fold-hinge-gutter" aria-hidden="true">
+      <div class="hinge-knuckle"></div>
+      <div class="hinge-shaft"></div>
+      <div class="hinge-knuckle"></div>
+    </div>
+
+    <!-- ================= RIGHT WING (MATCHING OPEN KANTO POKÉDEX RIGHT PANEL) ================= -->
+    <section id="secondary-wing" class="pokedex-wing wing-secondary" aria-label="Panel Derecho de la Pokédex">
+      <!-- Stepped Diagonal Top Edge of the Right Wing (Mirrors the Left Lid Cut) -->
+      <div class="right-top-cut">
+        <svg class="right-cut-svg" viewBox="0 0 400 64" preserveAspectRatio="none" aria-hidden="true">
+          <!-- Stepped diagonal border sloping down from left to right -->
+          <path d="M 0,10 L 170,10 L 235,56 L 400,56" fill="none" stroke="#4a070d" stroke-width="6" stroke-linejoin="round" />
+        </svg>
+      </div>
+
+      <!-- Folded Mode Close Handle (Only visible in 1-screen drawer mode) -->
+      <div class="folded-sheet-handle" id="folded-sheet-close">
+        <span class="handle-bar"></span>
+        <span class="handle-label">CERRAR PANEL ▼</span>
+      </div>
+
+      <!-- Right Wing Recessed Inner Panel -->
+      <div class="right-inner-body">
+
+        <!-- 1. TOP DARK RECTANGULAR SCREEN (Displays PokéAPI Data / Stats / Evolutions / Search) -->
+        <div class="right-main-screen">
+          <!-- Screen Header + Inline Search Input -->
+          <div class="rms-header">
+            <span id="rms-mode-title" class="rms-title">ENTRADA POKÉDEX</span>
+            <div class="rms-search-box">
+              <input
+                type="text"
+                id="search-input"
+                placeholder="Buscar nombre o #ID..."
+                autocomplete="off"
+              />
+              <button id="btn-clear-search" class="rms-clear-btn hidden" title="Limpiar">✕</button>
+            </div>
+          </div>
+
+          <!-- View 1: Pokédex Description & Genus (Default) -->
+          <div id="rms-view-info" class="rms-view active">
+            <p id="pokemon-genus" class="rms-genus">Pokémon Semilla</p>
+            <p id="pokemon-description" class="rms-description">
+              Cargando datos desde PokéAPI...
+            </p>
+          </div>
+
+          <!-- View 2: 8-Bit Base Stats -->
+          <div id="rms-view-stats" class="rms-view">
+            <div id="stats-bars" class="stats-bars"></div>
+          </div>
+
+          <!-- View 3: Evolution Chain (Interactive 8-Bit Sprites) -->
+          <div id="rms-view-evo" class="rms-view">
+            <div id="evolution-chain" class="evolution-chain"></div>
+          </div>
+
+          <!-- View 4: Type Weaknesses & Resistances -->
+          <div id="rms-view-types" class="rms-view">
+            <div id="type-defenses" class="type-defenses-grid"></div>
+          </div>
+
+          <!-- View 5: Level-Up Moves -->
+          <div id="rms-view-moves" class="rms-view">
+            <div id="moves-list" class="moves-list"></div>
+          </div>
+
+          <!-- View 6: Abilities & Capture Info -->
+          <div id="rms-view-abilities" class="rms-view">
+            <div id="pokemon-abilities" class="abilities-list"></div>
+          </div>
+        </div>
+
+        <!-- 2. 10 BLUE BUTTONS IN A 5x2 GRID (Switches PokéAPI Data Views & Actions) -->
+        <div class="blue-keypad-grid" role="tablist" aria-label="Teclado Azul Pokédex">
+          <button class="blue-key active" data-view="rms-view-info" data-title="ENTRADA POKÉDEX">INFO</button>
+          <button class="blue-key" data-view="rms-view-stats" data-title="ESTADÍSTICAS 8-BIT">STATS</button>
+          <button class="blue-key" data-view="rms-view-evo" data-title="CADENA EVOLUTIVA">EVOL</button>
+          <button class="blue-key" data-view="rms-view-types" data-title="EFECTIVIDAD TIPOS">TIPOS</button>
+          <button class="blue-key" data-view="rms-view-moves" data-title="ATAQUES POR NIVEL">MOVS</button>
+
+          <button class="blue-key" data-view="rms-view-abilities" data-title="HABILIDADES">HAB</button>
+          <button class="blue-key" id="key-cry" title="Escuchar Grito">GRITO</button>
+          <button class="blue-key" id="key-voice" title="Leer con Voz">VOZ</button>
+          <button class="blue-key" id="key-shiny" title="Alternar Shiny">SHINY</button>
+          <button class="blue-key" id="key-random" title="Pokémon Aleatorio">AZAR</button>
+        </div>
+
+        <!-- 3. MIDDLE CONTROLS ROW: 2 White Buttons (Left) + 2 Dark Thin Bars & Round Yellow Light (Right) -->
+        <div class="right-mid-controls">
+          <!-- 2 White Buttons side-by-side -->
+          <div class="white-buttons-pair">
+            <button id="btn-prev-footer" class="white-rect-btn" title="Pokémon Anterior (◀)">◀</button>
+            <button id="btn-next-footer" class="white-rect-btn" title="Siguiente Pokémon (▶)">▶</button>
+          </div>
+
+          <!-- Right Cluster: 2 Dark Pill Bars + Golden Yellow Round Indicator/Button -->
+          <div class="right-bars-and-lamp">
+            <div class="dark-thin-bars">
+              <button id="btn-gb-filter" class="dark-pill-bar" title="Cambiar paleta Game Boy"></button>
+              <button id="btn-scanlines" class="dark-pill-bar" title="Alternar líneas CRT"></button>
+            </div>
+            <button id="btn-era-sprite" class="yellow-round-lamp" title="Cambiar era de Sprite 8-Bit"></button>
+          </div>
+        </div>
+
+        <!-- 4. BOTTOM TWO DARK MINI-SCREENS (Height/Weight on Left, Types/Exp on Right) -->
+        <div class="right-bottom-screens">
+          <div class="dark-sub-screen">
+            <div class="sub-line">
+              <span>ALT:</span> <strong id="pokemon-height">-- m</strong>
+            </div>
+            <div class="sub-line">
+              <span>PESO:</span> <strong id="pokemon-weight">-- kg</strong>
+            </div>
+          </div>
+
+          <div class="dark-sub-screen">
+            <div class="sub-line">
+              <span>EXP:</span> <strong id="pokemon-exp">--</strong>
+            </div>
+            <div class="sub-line">
+              <span>CAP:</span> <strong id="pokemon-capture">--</strong>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
