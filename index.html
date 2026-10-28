@@ -68,19 +68,20 @@
 
     <!-- ================= LEFT WING (VISOR, GREEN SUB-DISPLAY & D-PAD) ================= -->
     <section class="pokedex-wing wing-primary" aria-label="Visor Principal Pokédex">
-      <!-- Top Sensor Header (Blue Lens + 3 LEDs + Stepped Seam) -->
+      <!-- Top Sensor Header (Blue Lens = Camera Scanner Trigger + 3 LEDs + Stepped Seam) -->
       <header class="left-top-header">
         <div class="sensor-cluster">
-          <div class="blue-lens-ring">
+          <button id="btn-lens-camera" class="blue-lens-ring" title="Activar Escáner de Cámara Pokédex" aria-label="Escáner de Cámara">
             <div id="main-blue-lens" class="blue-lens">
               <div class="lens-glare"></div>
             </div>
-          </div>
+          </button>
           <div class="status-leds">
             <span class="led led-red" id="led-red"></span>
             <span class="led led-yellow" id="led-yellow"></span>
             <span class="led led-green" id="led-green"></span>
           </div>
+          <button id="btn-api-key" class="api-key-chip" title="Configurar Gemini API Key">🔑 IA</button>
         </div>
         <svg class="left-header-seam" viewBox="0 0 400 44" preserveAspectRatio="none" aria-hidden="true">
           <path d="M 0,38 L 175,38 L 230,6 L 400,6" fill="none" stroke="#4a070d" stroke-width="6" stroke-linejoin="round" />
@@ -111,7 +112,7 @@
             <div class="sprite-stage" id="sprite-stage">
               <div id="loading-spinner" class="pixel-loader hidden">
                 <div class="pokeball-pixel"></div>
-                <span>CARGANDO...</span>
+                <span id="loader-text">CARGANDO...</span>
               </div>
               <img
                 id="pokemon-sprite"
@@ -120,6 +121,35 @@
                 alt="Sprite 8-Bit del Pokémon"
                 draggable="false"
               />
+
+              <!-- Live Camera Scanner Layer inside CRT -->
+              <div id="camera-scanner-layer" class="camera-scanner-layer hidden">
+                <video id="camera-video" class="camera-video" autoplay playsinline muted></video>
+                <img id="camera-captured-preview" class="camera-captured-preview hidden" alt="Captura" />
+                <canvas id="camera-canvas" class="hidden"></canvas>
+
+                <!-- 8-Bit Laser Targeting Reticle -->
+                <div class="scanner-reticle">
+                  <span class="reticle-corner tl"></span>
+                  <span class="reticle-corner tr"></span>
+                  <span class="reticle-corner bl"></span>
+                  <span class="reticle-corner br"></span>
+                  <div id="laser-scan-beam" class="laser-scan-beam hidden"></div>
+                </div>
+
+                <!-- Camera Controls Overlay -->
+                <div class="camera-hud-controls">
+                  <button id="btn-cam-flip" class="cam-hud-btn" title="Cambiar cámara frontal/trasera">🔄</button>
+                  <button id="btn-cam-capture" class="cam-shutter-btn" title="Capturar y Analizar con Gemini IA">
+                    📸 ESCANEAR
+                  </button>
+                  <label for="file-camera-fallback" class="cam-hud-btn" title="Subir foto o abrir cámara nativa iOS">
+                    🖼️
+                  </label>
+                  <input id="file-camera-fallback" type="file" accept="image/*" capture="environment" class="hidden" />
+                  <button id="btn-cam-close" class="cam-hud-btn close" title="Cerrar cámara">✕</button>
+                </div>
+              </div>
             </div>
 
             <!-- Bottom HUD inside CRT -->
@@ -222,6 +252,10 @@
           <!-- View 1: Pokédex Description & Genus (Default) -->
           <div id="rms-view-info" class="rms-view active">
             <p id="pokemon-genus" class="rms-genus">Pokémon Semilla</p>
+            <div id="ai-scan-banner" class="ai-scan-banner hidden">
+              <span class="ai-scan-tag">🔍 ESCÁNER GEMINI IA:</span>
+              <p id="ai-scan-report"></p>
+            </div>
             <p id="pokemon-description" class="rms-description">
               Cargando datos desde PokéAPI...
             </p>
@@ -262,7 +296,7 @@
           <button class="blue-key" data-view="rms-view-moves" data-title="ATAQUES POR NIVEL">MOVS</button>
 
           <button class="blue-key" data-view="rms-view-abilities" data-title="HABILIDADES">HAB</button>
-          <button class="blue-key" id="key-cry" title="Escuchar Grito">GRITO</button>
+          <button class="blue-key" id="key-scan" title="Escanear Pokémon u objeto con la Cámara">📷 SCAN</button>
           <button class="blue-key" id="key-voice" title="Leer con Voz">VOZ</button>
           <button class="blue-key" id="key-shiny" title="Alternar Shiny">SHINY</button>
           <button class="blue-key" id="key-random" title="Pokémon Aleatorio">AZAR</button>
@@ -310,6 +344,31 @@
       </div>
     </section>
 
+  </div>
+
+  <!-- ================= GEMINI VISION API KEY MODAL ================= -->
+  <div id="api-key-modal" class="dex-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="dex-modal-card">
+      <div class="dex-modal-header">
+        <span id="modal-title">🔑 CONFIGURAR GEMINI VISION IA</span>
+        <button id="btn-close-modal" class="modal-close-btn">✕</button>
+      </div>
+      <p class="dex-modal-desc">
+        Ingresa tu API Key de <strong>Google Gemini</strong> para que la cámara de la Pokédex identifique juguetes, cartas o dibujos de Pokémon, o compare cualquier mascota/objeto real con el Pokémon más parecido.
+      </p>
+      <input
+        type="password"
+        id="gemini-key-input"
+        class="dex-modal-input"
+        placeholder="AIzaSy..."
+        autocomplete="off"
+      />
+      <span class="dex-modal-note">Se guarda únicamente en el almacenamiento local (localStorage) de tu navegador.</span>
+      <div class="dex-modal-actions">
+        <button id="btn-clear-key" class="modal-btn secondary">BORRAR</button>
+        <button id="btn-save-key" class="modal-btn primary">GUARDAR API KEY</button>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

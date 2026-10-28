@@ -42,6 +42,7 @@ const STAT_META = {
 };
 
 const PALETTES = ['mode-color', 'mode-dmg', 'mode-pocket'];
+const GEMINI_KEY_STORAGE = 'pokedex_gemini_api_key';
 
 const state = {
   currentId: 1,
@@ -55,6 +56,7 @@ const state = {
   soundEnabled: true,
   cache: new Map(),
   foldMode: 'unfolded',
+  lastAiReport: null,
 };
 
 // ================= SAFARI / W3C FOLDABLE & POSTURE DETECTOR =================
@@ -560,7 +562,7 @@ function renderSecondaryMoves(pokemon) {
   });
 }
 
-function speakPokedexEntry() {
+function speakPokedexEntry(customPrefix = '') {
   if (!('speechSynthesis' in window) || !state.pokemonData) return;
 
   window.speechSynthesis.cancel();
@@ -569,7 +571,11 @@ function speakPokedexEntry() {
   const genus = document.getElementById('pokemon-genus').textContent;
   const desc = document.getElementById('pokemon-description').textContent;
 
-  const utterance = new SpeechSynthesisUtterance(`${name}. ${genus}. ${desc}`);
+  const fullText = customPrefix
+    ? `${name}. ${customPrefix} ${genus}. ${desc}`
+    : `${name}. ${genus}. ${desc}`;
+
+  const utterance = new SpeechSynthesisUtterance(fullText);
   utterance.lang = 'es-ES';
   utterance.rate = 1.02;
   utterance.pitch = 0.95;
@@ -581,8 +587,271 @@ function speakPokedexEntry() {
   window.speechSynthesis.speak(utterance);
 }
 
+// ================= POKÉDEX CAMERA SCANNER + GEMINI VISION API =================
+class PokedexCameraScanner {
+  constructor() {
+    this.stream = null;
+    this.facingMode = 'environment';
+    this.isActive = false;
+    this.pendingBase64 = null;
+  }
+
+  getApiKey() {
+    return (localStorage.getItem(GEMINI_KEY_STORAGE) || '').trim();
+  }
+
+  updateKeyBadge() {
+    const chip = document.getElementById('btn-api-key');
+    if (!chip) return;
+    const hasKey = Boolean(this.getApiKey());
+    chip.classList.toggle('configured', hasKey);
+    chip.textContent = hasKey ? '🔑 IA OK' : '🔑 IA';
+  }
+
+  openApiKeyModal() {
+    retroAudio.playButtonBlip();
+    const modal = document.getElementById('api-key-modal');
+    const input = document.getElementById('gemini-key-input');
+    input.value = this.getApiKey();
+    modal.classList.remove('hidden');
+    setTimeout(() => input.focus(), 50);
+  }
+
+  closeApiKeyModal() {
+    document.getElementById('api-key-modal').classList.add('hidden');
+  }
+
+  saveApiKey() {
+    const input = document.getElementById('gemini-key-input');
+    const val = input.value.trim();
+    if (val) {
+      localStorage.setItem(GEMINI_KEY_STORAGE, val);
+    } else {
+      localStorage.removeItem(GEMINI_KEY_STORAGE);
+    }
+    this.updateKeyBadge();
+    this.closeApiKeyModal();
+    retroAudio.playPokedexLoadedJingle();
+
+    if (this.pendingBase64 && val) {
+      const b64 = this.pendingBase64;
+      this.pendingBase64 = null;
+      this.analyzeWithGemini(b64);
+    }
+  }
+
+  async openScanner() {
+    retroAudio.playButtonBlip();
+    const layer = document.getElementById('camera-scanner-layer');
+    const video = document.getElementById('camera-video');
+    const preview = document.getElementById('camera-captured-preview');
+
+    preview.classList.add('hidden');
+    layer.classList.remove('hidden');
+    this.isActive = true;
+
+    await this.startStream(video);
+  }
+
+  async startStream(videoEl) {
+    this.stopStream();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      // Fallback for non-HTTPS local LAN testing on iOS Safari: trigger native camera input
+      document.getElementById('file-camera-fallback').click();
+      return;
+    }
+
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: this.facingMode },
+          width: { ideal: 720 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+      videoEl.srcObject = this.stream;
+      await videoEl.play();
+    } catch (err) {
+      console.warn('getUserMedia no disponible o permiso denegado, abriendo cámara nativa:', err);
+      document.getElementById('file-camera-fallback').click();
+    }
+  }
+
+  stopStream() {
+    if (this.stream) {
+      this.stream.getTracks().forEach((t) => t.stop());
+      this.stream = null;
+    }
+  }
+
+  closeScanner() {
+    retroAudio.playButtonBlip();
+    this.stopStream();
+    this.isActive = false;
+    document.getElementById('camera-scanner-layer').classList.add('hidden');
+    document.getElementById('laser-scan-beam').classList.add('hidden');
+  }
+
+  async flipCamera() {
+    retroAudio.playButtonBlip();
+    this.facingMode = this.facingMode === 'environment' ? 'user' : 'environment';
+    const video = document.getElementById('camera-video');
+    await this.startStream(video);
+  }
+
+  captureFromVideo() {
+    retroAudio.playButtonBlip();
+    const video = document.getElementById('camera-video');
+    if (!video.srcObject || !video.videoWidth) {
+      document.getElementById('file-camera-fallback').click();
+      return;
+    }
+
+    const canvas = document.getElementById('camera-canvas');
+    const maxDim = 640;
+    const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+    this.showPreviewAndAnalyze(dataUrl);
+  }
+
+  handleFileUpload(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.getElementById('camera-canvas');
+        const maxDim = 640;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        this.showPreviewAndAnalyze(dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  showPreviewAndAnalyze(dataUrl) {
+    const preview = document.getElementById('camera-captured-preview');
+    preview.src = dataUrl;
+    preview.classList.remove('hidden');
+
+    const base64Data = dataUrl.split(',')[1];
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      this.pendingBase64 = base64Data;
+      this.openApiKeyModal();
+      return;
+    }
+
+    this.analyzeWithGemini(base64Data);
+  }
+
+  async analyzeWithGemini(base64Jpeg) {
+    const apiKey = this.getApiKey();
+    const beam = document.getElementById('laser-scan-beam');
+    const shutterBtn = document.getElementById('btn-cam-capture');
+
+    beam.classList.remove('hidden');
+    shutterBtn.disabled = true;
+    shutterBtn.textContent = '📡 ANALIZANDO...';
+    retroAudio.beep(880, 0.08, 'square', 0.05);
+
+    const prompt = `Actúa como la inteligencia artificial de una Pokédex real de Kanto.
+Observa la imagen capturada por la cámara:
+1. Si aparece un Pokémon (juguete, carta, peluche, dibujo, pantalla), identifícalo con precisión.
+2. Si aparece un animal real, mascota, persona, planta u objeto cotidiano, compáralo con el Pokémon oficial (ID 1 al 1025) que más se le parezca física o conceptualmente.
+
+Devuelve ÚNICAMENTE un objeto JSON válido con este formato exacto:
+{
+  "pokemonId": <número entero entre 1 y 1025>,
+  "pokemonName": "<nombre en inglés minúsculas para PokéAPI>",
+  "isExactPokemon": <true si era un Pokémon real en la foto, false si fue una comparación con un objeto/ser real>,
+  "reportEs": "<breve reporte estilo Pokédex en español (máximo 22 palabras) explicando qué detectó la cámara y por qué corresponde a este Pokémon>"
+}`;
+
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inline_data: {
+                    mime_type: 'image/jpeg',
+                    data: base64Jpeg,
+                  },
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.2,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        throw new Error(`Gemini API HTTP ${response.status}: ${errBody}`);
+      }
+
+      const json = await response.json();
+      const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      const parsed = JSON.parse(rawText);
+
+      const targetPokemon = parsed.pokemonId || parsed.pokemonName || 25;
+      const reportEs =
+        parsed.reportEs || 'Espécimen identificado mediante escaneo óptico Pokédex.';
+
+      // Close scanner overlay & load matched Pokémon from PokéAPI
+      this.closeScanner();
+      await loadPokemon(targetPokemon);
+
+      // Show AI Scan Report on the Right Screen
+      const banner = document.getElementById('ai-scan-banner');
+      const reportEl = document.getElementById('ai-scan-report');
+      if (banner && reportEl) {
+        reportEl.textContent = reportEs;
+        banner.classList.remove('hidden');
+      }
+
+      // Speak the scan result + Pokédex entry
+      speakPokedexEntry(reportEs);
+    } catch (err) {
+      console.error('Error en escaneo Gemini Vision:', err);
+      alert(
+        'No se pudo analizar la imagen con Gemini API. Verifica tu API Key (botón 🔑 IA) o tu conexión.'
+      );
+    } finally {
+      beam.classList.add('hidden');
+      shutterBtn.disabled = false;
+      shutterBtn.textContent = '📸 ESCANEAR';
+    }
+  }
+}
+
+const cameraScanner = new PokedexCameraScanner();
+
 function stepPokemon(delta) {
   retroAudio.playButtonBlip();
+  document.getElementById('ai-scan-banner')?.classList.add('hidden');
   let nextId = state.currentId + delta;
   if (nextId < 1) nextId = MAX_POKEMON_ID;
   if (nextId > MAX_POKEMON_ID) nextId = 1;
@@ -652,9 +921,9 @@ function initEventListeners() {
   });
 
   // Action Blue Keys (Row 2)
-  document.getElementById('key-cry').addEventListener('click', () =>
-    retroAudio.playPokemonCry(state.pokemonData)
-  );
+  document.getElementById('key-scan').addEventListener('click', () => {
+    cameraScanner.openScanner();
+  });
   document.getElementById('key-voice').addEventListener('click', () => {
     retroAudio.playButtonBlip();
     speakPokedexEntry();
@@ -662,8 +931,51 @@ function initEventListeners() {
   document.getElementById('key-shiny').addEventListener('click', toggleShiny);
   document.getElementById('key-random').addEventListener('click', () => {
     retroAudio.playButtonBlip();
+    document.getElementById('ai-scan-banner')?.classList.add('hidden');
     const randomId = Math.floor(Math.random() * MAX_POKEMON_ID) + 1;
     loadPokemon(randomId);
+  });
+
+  // Camera Scanner Controls & Top Blue Lens Trigger
+  document.getElementById('btn-lens-camera').addEventListener('click', () => {
+    if (cameraScanner.isActive) {
+      cameraScanner.closeScanner();
+    } else {
+      cameraScanner.openScanner();
+    }
+  });
+  document.getElementById('btn-cam-close').addEventListener('click', () => {
+    cameraScanner.closeScanner();
+  });
+  document.getElementById('btn-cam-flip').addEventListener('click', () => {
+    cameraScanner.flipCamera();
+  });
+  document.getElementById('btn-cam-capture').addEventListener('click', () => {
+    cameraScanner.captureFromVideo();
+  });
+  document.getElementById('file-camera-fallback').addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      document.getElementById('camera-scanner-layer').classList.remove('hidden');
+      cameraScanner.isActive = true;
+      cameraScanner.handleFileUpload(file);
+    }
+    e.target.value = '';
+  });
+
+  // Gemini API Key Modal Controls
+  document.getElementById('btn-api-key').addEventListener('click', () => {
+    cameraScanner.openApiKeyModal();
+  });
+  document.getElementById('btn-close-modal').addEventListener('click', () => {
+    cameraScanner.closeApiKeyModal();
+  });
+  document.getElementById('btn-save-key').addEventListener('click', () => {
+    cameraScanner.saveApiKey();
+  });
+  document.getElementById('btn-clear-key').addEventListener('click', () => {
+    document.getElementById('gemini-key-input').value = '';
+    cameraScanner.saveApiKey();
   });
 
   // Right Wing Thin Dark Bars & Round Yellow Lamp
@@ -739,6 +1051,7 @@ function initEventListeners() {
 
 document.addEventListener('DOMContentLoaded', () => {
   foldableDetector.init();
+  cameraScanner.updateKeyBadge();
   initEventListeners();
   loadPokemon(1);
 });
